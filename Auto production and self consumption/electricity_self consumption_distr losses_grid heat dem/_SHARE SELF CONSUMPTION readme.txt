@@ -1,1 +1,0 @@
-For the share of self consumption for electricity go to  the file "Erforderliche Inputs Balmorel_self consumption_distr losses_grid heat dem.xlsx", Tab "overview", line 62
