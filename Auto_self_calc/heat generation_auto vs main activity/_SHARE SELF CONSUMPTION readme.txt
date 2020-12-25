@@ -1,0 +1,1 @@
+For the share of self consumption for heat go to  the file "Erforderliche Inputs Balmorel_generation heat_auto vs main activity_FS.xlsx", Tab "overview", line 62
