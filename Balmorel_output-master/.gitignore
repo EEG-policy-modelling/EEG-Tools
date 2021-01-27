@@ -1,0 +1,4 @@
+# Files that should not be tracked
+## all huge gdx and database files
+*.db
+*.gdx
