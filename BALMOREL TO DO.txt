@@ -1,0 +1,12 @@
+- PV Eigenverbrauch
+- Output processing
+- Wärmepumpen Flexibilität
+- Hydro Reservoirs verstehen
+- Power2Gas von AIT einbauen
+- Profile auf open source daten umschreiben
+- Solar Thermal in unsere clean Balmorel version einfügen
+- Nuclear bereinigen in conventional Power plant database
+
+
+
+
