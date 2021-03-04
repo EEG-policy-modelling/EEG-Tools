@@ -6,6 +6,7 @@
 - Profile auf open source daten umschreiben
 - Solar Thermal in unsere clean Balmorel version einfügen
 - Nuclear bereinigen in conventional Power plant database
+- coal phase out daten einpflegen
 
 
 
