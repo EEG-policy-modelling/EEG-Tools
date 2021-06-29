@@ -15,6 +15,7 @@ The following software is needed to run the script:
 - gdxpds
 - pandas
 - openpyxl
+- tkinter
 
 ## Execution
 
