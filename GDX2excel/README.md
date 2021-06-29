@@ -26,8 +26,7 @@ The following software is needed to run the script:
 2. Place all gdx files you want to process in the input directory in the project folder
 	> /input
 	
-3. Run the script
-	Select one of the options.
+3. Run the script and select one of the options.
 
 4. All excel files for each variable are now in the output folder.
 
