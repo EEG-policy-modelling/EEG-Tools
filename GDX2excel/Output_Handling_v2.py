@@ -5,7 +5,7 @@
 @author: Florian H
 
 ACHTUNG: Wie viele Regionen und Areas pro Land?
-        Für die Berechnung der marktwerte wird angenommen, dass es nur eine Region und Area pro Land gibt
+        Für die Berechnung der Marktwerte wird angenommen, dass es nur eine Region und Area pro Land gibt
     
 - MainResults in \model\MainResults.gdx
 - BASEresults in \output\BASE-results.gdx 
@@ -72,12 +72,12 @@ if not os.path.isdir('output'):
 # time program start
 time = datetime.datetime.now().strftime('%y%m%d-%H%M')
 
-#path MainResults
+#default path MainResults
 path_Main = os.getcwd() + '\\test_input\MainResults_flex.gdx'
-#path Baseresults
+#default path Baseresults
 path_Base = os.getcwd() + '\\test_input\BASE-results_flex.gdx'
 
-#market values are culculated for all of this tech
+#market values are culculated for all of this technologies
 listofRENTech = ['K5_GNR_WT_WIND_ONSHORE_2020','K5_GNR_WT_WIND_OFFSHORE_2020','K5_GNR_WT_WIND_ONSHORE_2030',
                  'K5_GNR_WT_WIND_OFFSHORE_2030','K5_GNR_WT_WIND_ONSHORE_2040','K5_GNR_WT_WIND_OFFSHORE_2040',
                  'K5_GNR_WT_WIND_ONSHORE_2050','K5_GNR_WT_WIND_OFFSHORE_2050','K5_GNR_RES_WTR_PMP_2015',
@@ -99,7 +99,7 @@ listofRENTech = ['K5_GNR_WT_WIND_ONSHORE_2020','K5_GNR_WT_WIND_OFFSHORE_2020','K
 
 def convertCountryRegion(in_conv,mode):
     # function converts Country into region and vice versa
-    #input type: string, return value type: string
+    # input type: string, return value type: string
     # mode 0 = country into region
     # mode 1 = region into country
     
@@ -372,6 +372,7 @@ def culc_Rev_tech(df_price,df_VGE_tech):
     return df_collect_c
 
 def nested_dict(n, type):
+    #creates multidimensional dictonarys
     if n == 1:
         return defaultdict(type)
     else:
@@ -462,6 +463,12 @@ def print_results_dict(year,sheetname,data):
     
     
 def Program1(print_all):
+    # function culcalates total generation, generation per technologie and market values
+    # if print_all == 1 all variables are exported to excel-files. NOTE: This could take a long time
+    # if print_all == 0 only a summary is exportet to excel-file
+    # input value: boolean
+    # return value: none
+    
     df_return = {}
     
     df_raw_price = proceedMainResults('1')
@@ -568,19 +575,7 @@ def Program1(print_all):
 
         #create dataframe for tech gen
         df3 = pd.DataFrame(columns=['Tech','Type']+list_of_region)
-        #df3.at[0,'AT']=169.0
         
-        # print(df3)
-        # print('GEN')
-        # print(data_collect_Gen[year])
-        # print('REV')
-        # print(data_collect_Rev[year])
-        # print('MV')
-        # print(data_collect_market_val[year])
-        
-        
-        
-        #input('ENTER')
         
         for region in list_of_region:
             country = convertCountryRegion(region,1)
@@ -623,17 +618,6 @@ def Program1(print_all):
                 df3[region]=data_collect_market_val[year][country][list_of_areas[0]][tech]
                 
                 data_collect_area_merge[year] = pd.concat([ data_collect_area_merge[year],df3],ignore_index=True)
-                # print('TECH')
-                #print(data_collect_area_merge[year])
-                #input('CONTINUE')
-                
-            # print('MERGE AREA')
-            # if region == list_of_region[0]:
-            #     print('FIRST')
-            #     df4=data_collect_area_merge[year]
-            # else:
-            #     print('BREAK')
-            #     df4=pd.merge(df4,data_collect_area_merge[year],on=['Tech','Type'],how='outer')
             
             if region == list_of_region[0]:
                 df4 = pd.DataFrame(columns = ['Tech','Type'])
@@ -642,9 +626,6 @@ def Program1(print_all):
             
         data_collect_merge[year] = pd.concat([data_collect_merge[year],df4],ignore_index=True)
         del df4
-        #print('DataCollectMerge_year after')
-        #print(data_collect_merge[year])
-        #input('ENTER')
             
 
     print('Total generation')
@@ -842,23 +823,7 @@ def proceedBaseResults(opt_res):
                     #df_BR_raw_collect[l].drop(df_BR_raw_collect[l].columns[3],axis=1,inplace=True)
                     df_BR_raw_collect[l].drop(var,axis=1,inplace=True)
                     print(df_BR_raw_collect[l])
-                    
                 
-                # #dropping columns
-                # for k in range(0,len(var_drop_list)):
-                #     print('DROPLIST k')
-                #     print(var_drop_list[k])
-                #     print(df_BR_raw_collect[l])
-                #     print(df_BR_raw_collect[l].columns)
-                #     #var = Sce
-                #     df_BR_rename[l].drop(var_drop_list[k],axis=1,inplace=True)
-                #     #df_BR_raw_collect[l].drop('Area',axis=1,inplace=True)
-                #     print(df_BR_rename[l])
-                
-
-                
-            #print(df_BR_raw_collect[l])
-            #print(df_BR_rename[l])
             
             
             df_return[l] = df_BR_raw_collect[l]
