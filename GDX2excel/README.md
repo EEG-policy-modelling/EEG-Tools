@@ -1,4 +1,4 @@
-# GDX2CSV
+# GDX2Excel
 
 This application converts one ore more variables from .gdx files produced by Balmorel to excel files.
 There is also a function to calculate market values.
