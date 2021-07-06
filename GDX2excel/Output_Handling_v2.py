@@ -988,6 +988,7 @@ while option != 0:
     print('2:  calculate market values (Input for GREENX) and EL_Price + VGE_T + QEEQ to excel') 
     print('3:  Manually choose variable from MainResults and export to .xlsx')
     print('4:  Manually choose variable from Base-results and export to .xlsx')
+    print('5:  Get electricity price for all countries and export to .xlsx')
     option = input('0: Stop execution \n')
     print('----------------------------------------------------------------------------------------------------\n')
     
@@ -1006,6 +1007,19 @@ while option != 0:
         print(df_return)
         for i in df_return.keys():
             print_results_df('0', str(i+1), df_return[i])
+    elif option == '5':       
+        data_collect_price ={}
+        df_price_raw = proceedMainResults('1')
+        
+        allyears_price = df_price_raw[0]['Y'].unique()
+        for year in allyears_price:        
+            #getting price data
+            df=df_price_raw[0].loc[df_price_raw[0]['Y'].isin([year])]
+            data_collect_price[year]=get_data_price(df)
+            
+        for year in allyears_price:
+            print_results_dict(year, '', data_collect_price[year])
+             
     elif option == 'c':
         print('Select MainResults-File')
         path_Main = filedialog.askopenfilename(title='Selcect MainResults.gdx',filetypes=[('gdx files','*.gdx'),('All files','*.*')])
