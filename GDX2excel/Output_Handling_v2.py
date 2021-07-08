@@ -4,17 +4,16 @@
 
 @author: Florian H
 
-ACHTUNG: Wie viele Regionen und Areas pro Land?
-        Für die Berechnung der Marktwerte wird angenommen, dass es nur eine Region und Area pro Land gibt
-    
-- MainResults in \model\MainResults.gdx
-- BASEresults in \output\BASE-results.gdx 
+
+NOTE: how many regions/areas there are in the different countries
+      For the calculation of the market values ​​it is assumed that there is only ONE region and area per country
+
 
 -------------------
 TODO:
-- typische Variablen vorbereiten
-- Diagramme ??
-- Grafische Oberfläche GUI
+- create plots and charts for typical variables (e.g. stacked area for generation, hydro storage, import/export)
+- GUI ?
+- extract 'list_of_REN' out of Input-Excel or other source? 
 
 
 
@@ -54,12 +53,13 @@ import sys
 from collections import defaultdict
 import tkinter as tk
 from tkinter import filedialog
+import matplotlib.pyplot as plt
 
 
-# path to the local gams installation
+# path to the local gams installation; change path in config.py
 gams_dir_cache = config.local_gams
 
-# project name
+# project name; change in config.py
 pr_name = config.project_name
 
 # directory to the input gdx file(s)
@@ -68,6 +68,10 @@ gdx_file_list = glob.glob('input/*.gdx')
 # create output directory
 if not os.path.isdir('output'):
     os.mkdir('output')
+
+# create directory for plots
+if not os.path.isdir('plots'):
+    os.mkdir('plots')
  
 # time program start
 time = datetime.datetime.now().strftime('%y%m%d-%H%M')
@@ -77,7 +81,7 @@ path_Main = os.getcwd() + '\\test_input\MainResults_flex.gdx'
 #default path Baseresults
 path_Base = os.getcwd() + '\\test_input\BASE-results_flex.gdx'
 
-#market values are culculated for all of this technologies
+#market values are culculated for all of this technologies, if available
 listofRENTech = ['K5_GNR_WT_WIND_ONSHORE_2020','K5_GNR_WT_WIND_OFFSHORE_2020','K5_GNR_WT_WIND_ONSHORE_2030',
                  'K5_GNR_WT_WIND_OFFSHORE_2030','K5_GNR_WT_WIND_ONSHORE_2040','K5_GNR_WT_WIND_OFFSHORE_2040',
                  'K5_GNR_WT_WIND_ONSHORE_2050','K5_GNR_WT_WIND_OFFSHORE_2050','K5_GNR_RES_WTR_PMP_2015',
@@ -759,8 +763,12 @@ def QEEQ(df_QE_raw):
     
 def proceedBaseResults(opt_res):
     #opening BaseResults, choosing variable, return dataframe
+    #option '1': get VGE_T and QEEQ
+    #option '4': Manually choose variable
+    #option '2': get VGE_T
+    
     df_return = {}
-    #option 1 (get VGE and QEEQ)
+    
     if opt_res == '1':
         #input('Press Enter to continue')
         print('Loading BaseResults.gdx')
@@ -770,6 +778,15 @@ def proceedBaseResults(opt_res):
         df_return[0]=VGE(dataframes)
         dataframes = gp.to_dataframe(gdx_file,'QEEQ', gams_dir = gams_dir_cache,old_interface=False)
         df_return[1]=QEEQ(dataframes)
+        
+        del dataframes
+        return df_return
+    
+    elif opt_res == '2':
+        print('Loading BaseResults.gdx')
+        gdx_file = path_Base
+        dataframes = gp.to_dataframe(gdx_file,'VGE_T', gams_dir = gams_dir_cache,old_interface=False)
+        df_return=VGE(dataframes)
         
         del dataframes
         return df_return
@@ -897,7 +914,7 @@ def culc_Total_Rev(df_price,df_tot_gen):
         
     
     print(tot_rev)
-    input('END')
+    #input('END')
     return tot_rev
 
 
@@ -960,6 +977,65 @@ def culculation(dict_main,dict_qeeq):
     
     writer.save()
 
+def plot_VGE(aggregate):
+    # plots VGE_T in a stacked area chart
+    
+    list_of_fuels = ['NGAS','COAL','LIGN','NUCL','WIND','SUN','WTR','BIOGAS','MSW','GEOTHERMAL','WOODCHIPS']
+    df_return = proceedBaseResults('2')
+    allyears = df_return['Year'].unique() 
+    print(allyears)
+    
+    data_collect_VGE = {}
+    
+    for year in allyears:    
+        data_collect_VGE[year] = get_data_VGE(df_return.loc[df_return['Year'].isin([year])])
+        
+        allareas = data_collect_VGE[year].keys()
+        
+        for area in allareas:
+            if aggregate:
+                df_temp = pd.DataFrame()
+                for fuel in list_of_fuels:
+                    
+                    df = data_collect_VGE[year][area].filter(regex=fuel)   #filter columns for all tech with NGAS
+                    sum_fuel = df.sum(axis=1)
+                    df_fuel = sum_fuel.to_frame(name=fuel)
+                    
+
+                    
+                    df_merge=df_temp.merge(df_fuel, how='outer', left_index=True, right_index=True)
+                    df_temp = df_merge
+                    
+                    
+                
+                #df_merge.drop(columns=['COAL','LIGN','NUCL','MSW','GEOTHERMAL','WOODCHIPS','BIOGAS'],inplace=True)        
+                print(df_merge)
+               
+                fig, ax = plt.subplots()
+                ax = plt.stackplot(df_merge.index,df_merge.values.T)
+                plt.xlim(4368,4536)
+                plt.legend(df_merge.columns,loc='upper left')
+                #plt.show()
+                
+                print('saving plot as pdf')
+                fig.savefig('plots/'+year +'_'+ area +'_'+ 'VGE_T'+'_'+time+'.pdf')
+            
+            else:
+                print('Start else \n')
+                data_collect_VGE[year][area].drop(columns=['Year','Area','S','T'],inplace=True)
+                print(data_collect_VGE[year][area])
+                fig, ax = plt.subplots()
+                ax = plt.stackplot(data_collect_VGE[year][area].index,data_collect_VGE[year][area].values.T)
+                plt.xlim(4368,4536)
+                plt.legend(data_collect_VGE[year][area].columns,loc='upper left')
+                #plt.show()
+                
+                print('saving plot as pdf')
+                fig.savefig('plots/'+year +'_'+ area +'_'+ 'VGE_T'+'_'+time+'.pdf')
+        
+
+    
+    
 #======================MAIN===================================================
 #look for input files
 root = tk.Tk()
@@ -989,6 +1065,7 @@ while option != 0:
     print('3:  Manually choose variable from MainResults and export to .xlsx')
     print('4:  Manually choose variable from Base-results and export to .xlsx')
     print('5:  Get electricity price for all countries and export to .xlsx')
+    print('6:  Plot VGE_T in stacked area plot')
     option = input('0: Stop execution \n')
     print('----------------------------------------------------------------------------------------------------\n')
     
@@ -1019,6 +1096,9 @@ while option != 0:
             
         for year in allyears_price:
             print_results_dict(year, '', data_collect_price[year])
+    
+    elif option == '6':
+        plot_VGE(False)
              
     elif option == 'c':
         print('Select MainResults-File')
