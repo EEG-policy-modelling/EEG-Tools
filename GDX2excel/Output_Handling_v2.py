@@ -54,6 +54,7 @@ from collections import defaultdict
 import tkinter as tk
 from tkinter import filedialog
 import matplotlib.pyplot as plt
+import inspect
 
 
 # path to the local gams installation; change path in config.py
@@ -114,6 +115,7 @@ def convertCountryRegion(in_conv,mode):
     RinSim = {'Region':['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','EL','HU','IE','IT','LV','LT','LU',
               'MT','NL','PO','PT','RO','SK','SI','ES','SE','CH','NO','UK']}
     
+    #creating dataframes
     df1 = pd.DataFrame(data = CinSim)
     df2 = pd.DataFrame(data = RinSim)
     
@@ -128,42 +130,45 @@ def convertCountryRegion(in_conv,mode):
     
 
 def get_data_price(df_price):
-    #function gets dataframe with price information and returns dictonary
+    #function gets dataframe with price information and returns dictonary with C as index
+    #input: year specific dataframe with prices of all C in simulation
+    #return value: dataframe dictonary; Country is index, columns are prices of regions per country
     
-    all_price_c = df_price['C'].unique()
-    df_price_collect_c = {}
-    df_price_collect_r = {}
+    all_price_c = df_price['C'].unique()        #getting all countries in dataframe
+    df_price_collect_c = {}                     #declaring dictonary for countries
+    df_price_collect_r = {}                     #declaring dictonary for regions
     
-    for C in all_price_c:
+    for C in all_price_c:                       #loop over all countries in dataframe
         print('Country: ' + C)
         df_price_collect_c[C] = df_price.loc[df_price['C'].isin([C])]
         
-        all_price_r = df_price_collect_c[C]['RRR'].unique()
+        all_price_r = df_price_collect_c[C]['RRR'].unique()         #getting all regions per country
         
-        for region in all_price_r:
+        for region in all_price_r:                  #loop over all regions
             print('Region: ' + region)
-            df_price_collect_r[region]=df_price_collect_c[C].loc[df_price_collect_c[C]['RRR'].isin([region])]
-            df_price_collect_r[region].rename(columns={'Value':region},inplace=True)
-            df_price_collect_r[region].drop(['RRR'],axis=1,inplace=True)
+            df_price_collect_r[region]=df_price_collect_c[C].loc[df_price_collect_c[C]['RRR'].isin([region])]  #getting all data of specific region
+            df_price_collect_r[region].rename(columns={'Value':region},inplace=True)                           #rename column name from Value to current region name
+            df_price_collect_r[region].drop(['RRR'],axis=1,inplace=True)                                       #drop column 'RRR'
             
-            #print('Test Punkt')
-            #print(df_price_collect_r[region])
-            #print(df_price_collect_c)
-            #input('Press Enter to continue')
-            if region in all_price_r[0]:
-                #del temp
-                temp = pd.DataFrame()
-                temp = df_price_collect_r[region].drop(region,axis=1)
-                temp.reset_index(drop=True, inplace=True)
+
+            if region in all_price_r[0]:        # for the first itteration, create temp dataframe and reset index
+
+                temp = pd.DataFrame()           #create new dataframe
+                temp = df_price_collect_r[region].drop(region,axis=1)   #drop column with values
+                temp.reset_index(drop=True, inplace=True)               #reseting index
             
-            df_price_collect_r[region].reset_index(drop=True, inplace=True)
-            df_price_collect_c[C] = temp.merge(df_price_collect_r[region][region], how='outer', left_index=True, right_index=True)
-            temp = df_price_collect_c[C]
+            df_price_collect_r[region].reset_index(drop=True, inplace=True)     #reset index to enable merging by index in the next line
+            df_price_collect_c[C] = temp.merge(df_price_collect_r[region][region], how='outer', left_index=True, right_index=True) #merge temp and existing dataframe
+            temp = df_price_collect_c[C]        
     
     return df_price_collect_c
 
 def get_data_VGE(df_VGE):
-        
+    #function receives dataframe with generation data for one year and creates dataframes per area. columns are generation per technologie
+    #input: dataframe with all VGE_T data which belongs to one year
+    #return value: dictonary with area as index; columns of dataframes Year,Area,S,T,+all technologies
+    
+    #declaring dictonaries
     data_collect_area = {}
     data_collect_tech = {}
     data_collect_techfull = {}
@@ -171,142 +176,76 @@ def get_data_VGE(df_VGE):
     
     #get all areas
     all_areas_peryear = df_VGE['Area'].unique()
-    for area in all_areas_peryear:
+    for area in all_areas_peryear:                  #loop over all areas
         
         print('Area: ' + area)
-        data_collect_area[area]=df_VGE.loc[df_VGE['Area'].isin([area])]
+        data_collect_area[area]=df_VGE.loc[df_VGE['Area'].isin([area])]         #assign area data to dictonary
         
-        #get all Technologies
+        #get all Technologies per area
         all_tech_perarea = data_collect_area[area]['Generator'].unique()
         
-        for technologie in all_tech_perarea:
+        for technologie in all_tech_perarea:        #loop over all tech in area
             print('Technology: ' + technologie)
-            data_collect_tech[technologie]=data_collect_area[area].loc[data_collect_area[area]['Generator'].isin([technologie])]
+            data_collect_tech[technologie]=data_collect_area[area].loc[data_collect_area[area]['Generator'].isin([technologie])] #assign tech related data to tech dictonary
 
-            if data_collect_tech[technologie].empty:
+            if data_collect_tech[technologie].empty:    #if a dataframe is empty, don't add it to dictonary techfull
                 print('Dataframe empty')
             else:
                 data_collect_techfull[technologie]=data_collect_tech[technologie]
             
-            data_collect_techfull[technologie].rename(columns={'Level':technologie},inplace=True)
-            data_collect_techfull[technologie].drop('Generator',axis=1,inplace=True)
-            #print(data_collect_techfull[technologie])
+            data_collect_techfull[technologie].rename(columns={'Level':technologie},inplace=True) #rename column Level to technolgy name
+            data_collect_techfull[technologie].drop('Generator',axis=1,inplace=True)              #drop column with technology name
             
-            if technologie in all_tech_perarea[0]:
+            if technologie in all_tech_perarea[0]:          #if it's the first iteration, create temp dataframe
                 #del temp
-                temp = pd.DataFrame()
-                temp = data_collect_techfull[technologie].drop(technologie,axis=1)
-                temp.reset_index(drop=True, inplace=True)
+                temp = pd.DataFrame()                                                   #creating new dataframe
+                temp = data_collect_techfull[technologie].drop(technologie,axis=1)      #drop tech data
+                temp.reset_index(drop=True, inplace=True)                               #reseting index
                 
-            data_collect_techfull[technologie].reset_index(drop=True, inplace=True)
-            data_collect_merge[area] = temp.merge(data_collect_techfull[technologie][technologie], how='outer', left_index=True, right_index=True)
+            data_collect_techfull[technologie].reset_index(drop=True, inplace=True)     #reset index to enable merging by index in the next line
+            data_collect_merge[area] = temp.merge(data_collect_techfull[technologie][technologie], how='outer', left_index=True, right_index=True) #merge temp and current dataframe
             temp = data_collect_merge[area]
-            #print(temp)
-    
+          
+    return data_collect_merge                              #return value: dictonary with area as index; columns of dataframes Year,Area,S,T,+all technologies
 
-    return data_collect_merge
-    
-    # for year in all_years:
-        
-    #     print('Year: ' + year)
-    
-    #     data_collect_year[year]=data_raw.loc[data_raw['Year'].isin([year])]
-        
-    #     # csv_file = 'output/Results_'+ year +'_'+ time +'.xlsx'
-    #     # #creating excel file if it not exists
-    #     # if not path.exists(csv_file):
-    #     #     null = pd.DataFrame()
-    #     #     #create results excel-file           
-    #     #     with pd.ExcelWriter(csv_file, engine="openpyxl") as writer:
-    #     #         null.to_excel(writer, sheet_name = 'Results', encoding='utf8', index=False)
-           
-    #     all_areas_peryear = data_collect_year[year]['Area'].unique()
-    #     for area in all_areas_peryear:
-            
-    #         print('Area: ' + area)
-    #         data_collect_area[area]=data_collect_year[year].loc[data_collect_year[year]['Area'].isin([area])]
-            
-    #         all_tech_perarea = data_collect_area[area]['Generator'].unique()
-            
-    #         for technologie in all_tech_perarea:
-    #             print('Technologie: ' + technologie)
-    #             data_collect_tech[technologie]=data_collect_area[area].loc[data_collect_area[area]['Generator'].isin([technologie])]
-    
-    #             if data_collect_tech[technologie].empty:
-    #                 print('Dataframe empty')
-    #             else:
-    #                 data_collect_techfull[technologie]=data_collect_tech[technologie]
-                
-    #             data_collect_techfull[technologie].rename(columns={'Level':technologie},inplace=True)
-    #             data_collect_techfull[technologie].drop('Generator',axis=1,inplace=True)
-    #             #print(data_collect_techfull[technologie])
-                
-     
-    #             if technologie in all_tech_perarea[0]:
-    #                 #del temp
-    #                 temp = pd.DataFrame()
-    #                 temp = data_collect_techfull[technologie].drop(technologie,axis=1)
-    #                 temp.reset_index(drop=True, inplace=True)
-                    
-    #             data_collect_techfull[technologie].reset_index(drop=True, inplace=True)
-    #             data_collect_merge[area] = temp.merge(data_collect_techfull[technologie][technologie], how='outer', left_index=True, right_index=True)
-    #             temp = data_collect_merge[area]
-    #             #print(temp)
-            
-    #         #data_collect_merge[area].drop('Generator',axis=1,inplace=True)
-    
-    #         # print excel file creation progress
-    #         print('Writing data to excel worksheet for area: ' + area)
-    
-    #         # create time stamp with current local time in the format (yymmdd-HHMM)
-    #         #time = datetime.datetime.now().strftime('%y%m%d-%H%M')
-    
-    #         # path to excel file with the name of the variable in current iteration
-    #         #csv_file = 'output/Results.xlsx'
-            
-    #         with pd.ExcelWriter(csv_file, engine="openpyxl", mode="a") as writer:
-    #             data_collect_merge[area].to_excel(writer, sheet_name = 'EL_gen_' + area, encoding='utf8', index=False)
     
 def get_data_QEEQ(df_QEEQ):
-        
+    #function receives dataframe with QEEQ data for one year and creates dataframes with all data from all regions in columns
+    #input: dataframe with all QEEQ data which belongs to one year
+    #return value: dataframe with all QEEQ data. regions as columns; columns: Year,S,T,+all regions      
     
+    #declaring dictonaries
     data_collect_region = {}
     data_collect_merge = {}
     
     
-    all_region_peryear = df_QEEQ['Region'].unique()
+    all_region_peryear = df_QEEQ['Region'].unique()  #getting all regions in QEEQ
     
-    for region in all_region_peryear:
+    for region in all_region_peryear:       #loop over all regions
         
         print('Region: ' + region)
-        data_collect_region[region]=df_QEEQ.loc[df_QEEQ['Region'].isin([region])]
-        data_collect_region[region].rename(columns={'Level':region},inplace=True)
-        data_collect_region[region].drop('Region',axis=1,inplace=True)
+        data_collect_region[region]=df_QEEQ.loc[df_QEEQ['Region'].isin([region])]           #split data into regions and add to dictonary
+        data_collect_region[region].rename(columns={'Level':region},inplace=True)           #rename column Level to name of area
+        data_collect_region[region].drop('Region',axis=1,inplace=True)                      #drop column region
         
-        if region in all_region_peryear[0]:
+        if region in all_region_peryear[0]:     #if it's the first iteration, create temp dataframe
             #del temp
             temp = pd.DataFrame()
             temp = data_collect_region[region].drop(region,axis=1)
             temp.reset_index(drop=True, inplace=True)
         
-        data_collect_region[region].reset_index(drop=True, inplace=True)
-        data_collect_merge= temp.merge(data_collect_region[region][region], how='outer', left_index=True, right_index=True)
+        data_collect_region[region].reset_index(drop=True, inplace=True)     #reset index to enable merging by index in the next line
+        data_collect_merge= temp.merge(data_collect_region[region][region], how='outer', left_index=True, right_index=True)     #merge temp and current dataframe
         temp = data_collect_merge
-        #print(temp)
-
-    
-    # print('Writing data to excel worksheet for QEEQ: ')
-    # csv_file = 'output/Results_'+ year +'_'+ time +'.xlsx'
-    # with pd.ExcelWriter(csv_file, engine="openpyxl", mode="a") as writer:
-    #     data_collect_merge[year].to_excel(writer, sheet_name = 'EL_gen_tot', encoding='utf8', index=False)
         
     print('End of QEEQ')
-
-    #print(data_collect_merge)
     return data_collect_merge
 
 def isRENTech(Tech):
-    #check if tech is a renewable
+    #check if tech is a renewable; see listofRENTech; if technologie is found in listofRENTech return is TRUE
+    #input: name of technologie
+    #return: boolean (True/False)
+    
     if Tech in listofRENTech:
         return True
     else:
@@ -315,31 +254,33 @@ def isRENTech(Tech):
 
 def culc_Total_Gen_tech(df_VGE_tech):
     #culcalate tech specific total generation
+    #input: dictonary with VGE_T data for one year; area is index of dictonary
+    #return value: dictonary with area as index; columns of dataframes: Technologies; value is total generation of technologie 
     
-    df_Gen_tech_sum = pd.DataFrame()
+    df_Gen_tech_sum = pd.DataFrame()                #create new dataframe
     
-    df_collect = {}
-    list_of_areas = list(df_VGE_tech.keys())
+    df_collect = {}                                 #declaring dictonary
+    list_of_areas = list(df_VGE_tech.keys())        #getting list of all indices 
     
-    for area in list_of_areas:
-        list_df_header = list(df_VGE_tech[area].columns)
+    for area in list_of_areas:                      #loop over all areas
+        list_df_header = list(df_VGE_tech[area].columns)            #get all technologies
         
-        del df_Gen_tech_sum
-        df_Gen_tech_sum = pd.DataFrame()
+        del df_Gen_tech_sum                         #delete dataframe bevor creating a new one
+        df_Gen_tech_sum = pd.DataFrame()            #create new dataframe
         
-        for tech in list_df_header[4:]:
-            if isRENTech(tech):
-                sum_tech=df_VGE_tech[area][tech].sum(axis=0)
+        for tech in list_df_header[4:]:             #loop over technologies; technologies start at 4th column         
+            if isRENTech(tech):                     #checking for renewable technologie; only market values from renewable techs are culculated
+                sum_tech=df_VGE_tech[area][tech].sum(axis=0)        #culcalating sum 
                 df_Gen_tech_sum[tech] = None
-                df_Gen_tech_sum.at[0,tech]= sum_tech
-        df_collect[area] = df_Gen_tech_sum
+                df_Gen_tech_sum.at[0,tech]= sum_tech                #add entry in line 0, column tech
+        df_collect[area] = df_Gen_tech_sum                          #add dataframe to dictonary
         
     return df_collect
 
 def culc_Rev_tech(df_price,df_VGE_tech):
     #culcalate tech specific revenue
-    
-    
+    #input: 
+    #return: 
     
     list_of_countries = list(df_price.keys())
     list_of_areas = list(df_VGE_tech.keys())
@@ -473,38 +414,30 @@ def Program1(print_all):
     # input value: boolean
     # return value: none
     
-    df_return = {}
+    df_return = {}          #declaring dictonary
     
-    df_raw_price = proceedMainResults('1')
-    #print(df_raw_price)
+    df_raw_price = proceedMainResults('1') #get price data
 
-    #input('MainResults end. Press Enter to continue')
     print('----------------------------------------------------------------------------------------------------\n')
     
-    df_return = proceedBaseResults('1')
+    df_return = proceedBaseResults('1')     #get generation data VGE_T and data QEEQ
     
-    df_raw_VGE = df_return[0]
+    #assigning dataframes to seperate variables; 
+    df_raw_VGE = df_return[0]                  
     df_raw_QEEQ = df_return[1]
-    
-    #print(df_raw_VGE)
-    #print(df_raw_QEEQ)
-    #input('Baseresults end. Press Enter to continue')
     
     #check whether years in variables match
     allyears_price = df_raw_price[0]['Y'].unique()
-    #allyears_price = ['2030','2040']
     allyears_VGE = df_raw_VGE['Year'].unique()
-    #allyears_VGE = ['2030','2040']
     allyears_QEEQ = df_raw_QEEQ['Year'].unique()
-    #allyears_QEEQ = ['2030','2050']
         
     if not (len(allyears_price) == len(allyears_VGE) and len(allyears_VGE) == len(allyears_QEEQ) and len(allyears_price) == len(allyears_QEEQ)):
-        print('Error: years dont match1')
+        print('Error: years dont match')
         sys.exit("Error message")
     else:        
         for element in range(0,len(allyears_price)):
             if not allyears_price[element] == allyears_VGE[element]:
-                print('Error: years dont match2')
+                print('Error: years dont match')
                 sys.exit("Error message")
     
     #declaration of dictonaries
@@ -524,18 +457,17 @@ def Program1(print_all):
     data_collect_area_merge = {}
     
     #getting data
-    for year in allyears_price:
+    for year in allyears_price:     #loop over all years
         
         #getting price data
-        df=df_raw_price[0].loc[df_raw_price[0]['Y'].isin([year])]
-        data_collect_price[year]=get_data_price(df)
+        df=df_raw_price[0].loc[df_raw_price[0]['Y'].isin([year])]       #assign all data from current year to new dataframe
+        data_collect_price[year]=get_data_price(df)                     #formatting dataframe
         
         #getting generation data
-        #df = df_raw_VGE.loc[df_raw_VGE['Year'].isin([year])]
-        data_collect_VGE[year] = get_data_VGE(df_raw_VGE.loc[df_raw_VGE['Year'].isin([year])])
+        data_collect_VGE[year] = get_data_VGE(df_raw_VGE.loc[df_raw_VGE['Year'].isin([year])])  #getting all data from current year and format dataframe
         
         #getting total generation data
-        data_collect_QEEQ[year] = get_data_QEEQ(df_raw_QEEQ.loc[df_raw_QEEQ['Year'].isin([year])])
+        data_collect_QEEQ[year] = get_data_QEEQ(df_raw_QEEQ.loc[df_raw_QEEQ['Year'].isin([year])])    #getting all data from current year and format dataframe
     
     # culculation total generation
     
@@ -550,14 +482,14 @@ def Program1(print_all):
         
     #culculation tech
     
-    for year in allyears_price:
-        #tech specific generation
-        data_collect_Gen[year] = culc_Total_Gen_tech(data_collect_VGE[year])
+    for year in allyears_price:   #loop over all years
+        data_collect_Gen[year] = culc_Total_Gen_tech(data_collect_VGE[year])       #get tech specific generation
         print('TotGen_tech: ',data_collect_Gen[year])
-        #tech specific revenue 
-        data_collect_Rev[year] = culc_Rev_tech(data_collect_price[year],data_collect_VGE[year])
+
+        data_collect_Rev[year] = culc_Rev_tech(data_collect_price[year],data_collect_VGE[year])     #get tech specific revenue
         print('TotRev_tech: ',data_collect_Rev[year])
-        #tech specific market value
+        input('STOP')
+        #tech specific market value        
         data_collect_market_val[year] = culc_market_val(data_collect_Price_average[year],data_collect_Gen[year],data_collect_Rev[year])
         print('Market values: ',data_collect_market_val[year])
     
@@ -656,17 +588,21 @@ def Program1(print_all):
 def proceedMainResults(opt_main):
 #Opening MainResults.gdx; Choose variable; get data; write it to excel or csv
     #opening MainResults.gdx in current working directory
-    print('Loading MainResults.gdx')
-    gdx_file = path_Main
-    #dataframes = gp.to_dataframes(gdx_file,gams_dir=gams_dir)
-    #get wanted variable
-    dataframes ={}
+    #opt_main: option which variable should be loaded from MainResults.gdx
+    #opt_main == 3: chose variable
+    #opt_main != 3: loading EL_PRICE_YCRST
+    #return value: dictonary with number corresponding to variable as index; columns of dataframe Y,C,+not dropped columns
     
-    if opt_main == '3':
+    print('Loading MainResults.gdx')
+    gdx_file = path_Main                #new name for path
+    #get wanted variable
+    dataframes ={}                      #declaring dictonary
+    
+    if opt_main == '3':             #manually chose variable from MainResults.gdx
         variable_input = input('Variable?\n')
-        variable_input_list = variable_input.split()
+        variable_input_list = variable_input.split()        #input splitted by space
         #check for wrong input
-        for i in range(0,len(variable_input_list)):
+        for i in range(0,len(variable_input_list)):         #looping over all variables
             dataframes[variable_input_list[i]] = gp.to_dataframe(gdx_file,variable_input_list[i], gams_dir = gams_dir_cache,old_interface=False)
 
         df_raw_collect = {}
@@ -677,9 +613,9 @@ def proceedMainResults(opt_main):
             df_raw_collect[j] = dataframes[variable_input_list[j]]
             #choose parameter
             list_df_header = list(df_raw_collect[j].columns)
-            print(list_df_header[2:])
+            print(list_df_header[2:])                     #First two columns are always Y and C
             var_drop = input('Select from the above list which parameter you want to drop from variable ' + variable_input_list[j] + '\n (Year Y and country C are always mentioned)\n')
-            var_drop_list = var_drop.split()
+            var_drop_list = var_drop.split()    #input of columns to drop; splitted by space
         
             #checking wrong input
             for var in var_drop_list:
@@ -695,15 +631,15 @@ def proceedMainResults(opt_main):
             #replace EPS (=5e+300) with 0
             df_raw_collect[j]['Value'].values[df_raw_collect[j]['Value'].values > 4e300] = 0
         
-        del dataframes
-            
-    else:        
+        del dataframes            #deleting dataframes to free system memory
+        
+    else:                       #get data from variable EL_PRICE_YCRST; similar to opt_main == '3'    
         variable_input_list=['EL_PRICE_YCRST']
         var_drop_list=['UNITS']
 
         dataframes = gp.to_dataframe(gdx_file,variable_input_list[0], gams_dir = gams_dir_cache,old_interface=False)
         
-        df_raw_collect = {}
+        df_raw_collect = {}     #declaring dictonary
         #loop through variable input
         for j in range(0,len(variable_input_list)):
             #get selcted dataframe
@@ -727,10 +663,13 @@ def proceedMainResults(opt_main):
         
         del dataframes
     
-    return(df_raw_collect)
+    return(df_raw_collect)      #return dictonary with number corresponding to variable as index
 
 
 def VGE(data_raw):
+    #formating VGE_T; renaming and reordering of columns
+    #input: raw VGE_T dataframe
+    #return value: formated dataframe; columns Year,Area,Generation,S,T,Level
     
     #rename unnamed columns
     col_rename_list = ['Sce','Y1','Year','Area','Generator','S','T']
@@ -764,25 +703,26 @@ def QEEQ(df_QE_raw):
 def proceedBaseResults(opt_res):
     #opening BaseResults, choosing variable, return dataframe
     #option '1': get VGE_T and QEEQ
-    #option '4': Manually choose variable
     #option '2': get VGE_T
+    #option '4': Manually choose variable
+    #return value: dictonary of dataframes; dictonary with number corresponding to variable as index; dataframe columns
+    #              from option or manually chosen
     
-    df_return = {}
     
-    if opt_res == '1':
-        #input('Press Enter to continue')
+    df_return = {}      #declaring dictonary
+    
+    if opt_res == '1':          #option1: getting VGE_T and QEEQ
         print('Loading BaseResults.gdx')
         gdx_file = path_Base
-        #dataframes = gp.to_dataframes(gdx_file,gams_dir=gams_dir)
-        dataframes = gp.to_dataframe(gdx_file,'VGE_T', gams_dir = gams_dir_cache,old_interface=False)            
-        df_return[0]=VGE(dataframes)
+        dataframes = gp.to_dataframe(gdx_file,'VGE_T', gams_dir = gams_dir_cache,old_interface=False)       #getting variable from .gdx to dataframe            
+        df_return[0]=VGE(dataframes)                                                                        #processing data to wanted dataformat, see function VGE
         dataframes = gp.to_dataframe(gdx_file,'QEEQ', gams_dir = gams_dir_cache,old_interface=False)
-        df_return[1]=QEEQ(dataframes)
+        df_return[1]=QEEQ(dataframes)                                                                       #processing data to wanted dataformat, see function QEEQ
         
-        del dataframes
+        del dataframes           #deleting dataframe to free memory space
         return df_return
     
-    elif opt_res == '2':
+    elif opt_res == '2':       #option1: getting VGE_T
         print('Loading BaseResults.gdx')
         gdx_file = path_Base
         dataframes = gp.to_dataframe(gdx_file,'VGE_T', gams_dir = gams_dir_cache,old_interface=False)
@@ -856,34 +796,39 @@ def proceedBaseResults(opt_res):
 
 def culc_Total_Gen(df_vge):
     # culculats total gen in region, return dataframe over all regions
+    #input: dictonary with VGE_T data for one year; area is index of dictonary
+    #return value:
     
+    #declaring dictonaries
     gen_tot = pd.DataFrame()
     gen_temp = pd.DataFrame()
     gen = pd.DataFrame()
     
-    list_of_areas = list(df_vge.keys())
+    list_of_areas = list(df_vge.keys())         #getting all areas from indices of dictonary
     
     #summerize total generation of all tech in area
-    for area in list_of_areas:
+    for area in list_of_areas:                  #loop over all areas
         sum_temp = df_vge[area].sum(axis=1)
     
         gen_temp[area] = sum_temp
     
     
     all_columns = gen_temp.columns
-    
-    #summerize over all areas
-    for areas in all_columns:
+
+    #summerize over all areas of one country
+    for areas in all_columns:               #loop over all areas
         
         if areas[2:] == '_A':
+            print(areas[2:])
+            input('STOP')
             #get all areas in the region
             df2 = gen_temp.filter(regex=areas[:2])
             #sum over all areas und name the columns as regions
             gen[areas[:2]] = df2.sum(axis=1)
-            gen_temp2=gen.sum(axis=0)
+            gen_temp2 = gen.sum(axis=0)
             new_region = areas[:2]
             gen_tot[new_region] = None
-            gen_tot.at[0,new_region]=gen_temp2[new_region]
+            gen_tot.at[0,new_region] = gen_temp2[new_region]
 
     return gen_tot
 
@@ -1037,26 +982,25 @@ def plot_VGE(aggregate):
     
     
 #======================MAIN===================================================
+#User interface
+
 #look for input files
 root = tk.Tk()
 root.withdraw()
 
+#print selected paths for .gdx-files
 print('----------------------------------------------------------------------------------------------------\n')
 print('Current paths of file MainResults')
-#print('Select MainResults-File')
-#path_Main = filedialog.askopenfilename(title='Selcect MainResults.gdx',filetypes=[('gdx files','*.gdx'),('All files','*.*')])
 print(path_Main)
 print('----------------------------------------------------------------------------------------------------\n')
 print('Current paths of file BaseResults')
-#print('Select BaseResults-File')
-#path_Base = filedialog.askopenfilename(title='Selcect BASEResults.gdx',filetypes=[('gdx files','*.gdx'),('All files','*.*')])
 print(path_Base)
 
 #choose option
 print('----------------------------------------------------------------------------------------------------\n')
 print('Output Handling MainResults.gdx and BASE_results.gdx to .xlsx')
-option = 99
-while option != 0:
+option = 99                 #arbitrary number to start the while loop in any case
+while option != 0:          #end loop if option 0 is chosen
     
     print('\n Choose Option: (by number or character)\n')
     print('c: Choose new filepaths of MainResults and BaseResults\n')
@@ -1069,8 +1013,8 @@ while option != 0:
     option = input('0: Stop execution \n')
     print('----------------------------------------------------------------------------------------------------\n')
     
-    if option == '1':
-        Program1(False)
+    if option == '1':       #start program 1 with option FALSE
+        Program1(False)         
         
     elif option == '2':
         Program1(True)
