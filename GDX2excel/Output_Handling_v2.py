@@ -103,10 +103,12 @@ listofRENTech = ['K5_GNR_WT_WIND_ONSHORE_2020','K5_GNR_WT_WIND_OFFSHORE_2020','K
                  'K5_GNR_BATTERY_LS_2020','K5_GNR_BATTERY_LS_2030','K5_GNR_BATTERY_LS_2040','K5_GNR_BATTERY_LS_2050']
 
 def convertCountryRegion(in_conv,mode):
-    # function converts Country into region and vice versa
-    # input type: string, return value type: string
+    # function converts Country into region and vice versa; check if the model has new countries or regions
     # mode 0 = country into region
     # mode 1 = region into country
+    # input type: string
+    # return value: string
+
     
     CinSim = {'Country':['AUSTRIA','BELGIUM','BULGARIA','CROATIA','CYPRUS','CZECHIA','DENMARK','ESTONIA','FINLAND',
               'FRANCE','GERMANY','GREECE','HUNGARY','IRELAND','ITALY','LATVIA','LITHUANIA','LUXEMBOURG',
@@ -279,41 +281,41 @@ def culc_Total_Gen_tech(df_VGE_tech):
 
 def culc_Rev_tech(df_price,df_VGE_tech):
     #culcalate tech specific revenue
-    #input: 
-    #return: 
+    #input: dictonary with prices, C as index; dictonary with generation, area as index 
+    #return: 2-dim dictonary with country and area as index; dataframe: columns tech; value of revenue in first line
     
-    list_of_countries = list(df_price.keys())
-    list_of_areas = list(df_VGE_tech.keys())
+    list_of_countries = list(df_price.keys())               #get all ccountries
+    list_of_areas = list(df_VGE_tech.keys())                #get all areas
     
-    tech_rev = pd.DataFrame()
+    tech_rev = pd.DataFrame()                               #create new dataframe
     
-    df_collect = {}
-    df_collect_c = nested_dict(2, float)
+    df_collect = {}                                         #declaring dictonary
+    df_collect_c = nested_dict(2, float)                    #declaring 2-dimensionel dictonary
 
     #culculate total revenue
-    for country in list_of_countries:
+    for country in list_of_countries:                       #loop all countries
         
         #convert country to region, mode 0
-        region = convertCountryRegion(country,0)
+        region = convertCountryRegion(country,0)            
         
-        for area in list_of_areas:
-            if area[:2]== region:
-                list_df_header = list(df_VGE_tech[area].columns)
-                for tech in list_df_header[4:]:
-                    if isRENTech(tech):
-                        rev_tech = df_price[country][region]*df_VGE_tech[area][tech]
-                        rev_tech_sum = rev_tech.sum(axis=0)
+        for area in list_of_areas:                          #loop all areas
+            if area[:2]== region:                           #if areas is in current region
+                list_df_header = list(df_VGE_tech[area].columns)        #get all column names
+                for tech in list_df_header[4:]:                         #loop over all technologies; starting at column 4
+                    if isRENTech(tech):                                 #check if technology is REN
+                        rev_tech = df_price[country][region]*df_VGE_tech[area][tech]    #culculate revenue, hourly values
+                        rev_tech_sum = rev_tech.sum(axis=0)                             
                         tech_rev[tech] = None
                         tech_rev.at[0,tech]= rev_tech_sum
                         
-                df_collect[area] = tech_rev
-                del tech_rev
-                tech_rev = pd.DataFrame()
+                df_collect[area] = tech_rev                             #insert the value for one area in a dictonary
+                del tech_rev                                            #delete temp dataframe
+                tech_rev = pd.DataFrame()                               #create new empty dataframe
         
-                df_collect_c[country][area]=df_collect[area]
+                df_collect_c[country][area]=df_collect[area]            #collect the data in a 2-dim dictonary
             #else:
                 #print('BREAK')
-    
+
     return df_collect_c
 
 def nested_dict(n, type):
@@ -324,57 +326,64 @@ def nested_dict(n, type):
         return defaultdict(lambda: nested_dict(n-1, type))
     
 def culc_market_val(price_avr,tech_gen,tech_rev):
-    # culculate relativ market value for each tech
+    # culculate relativ market value for each REN tech
+    #input: dataframe with avarage prices, columns are regions, ; dictonary with generation, area as index ; 
+    #       2-dim dictonary for revenue, country and area as index
+    #return: 2-dim dictonary for market value, index is country and area, columns of dataframe are technologies; market value is in first line
+    
     print('culcalating market value')
+
     #get all regions (=countries)
     list_df_header = list(price_avr.columns)
     
-    market_val = pd.DataFrame()
+    market_val = pd.DataFrame()             #create new dataframe
     
-    data_collect_a = {}
-    #create 2-dim dictonary
+    data_collect_a = {}                     #declare dictonary
+    #declaring 2-dim dictonary
     data_collect_r = nested_dict(2, float)
     
-    for region in list_df_header:
-        country = convertCountryRegion(region,1)
+    for region in list_df_header:                   #loop all regions
+        country = convertCountryRegion(region,1)    #convert region to country
         
         #get all areas in region
         list_of_areas = list(tech_rev[country].keys())
 
-        for area in list_of_areas:
+        for area in list_of_areas:                                                                  #loop all areas
             #get tech in area
-            list_of_tech = list(tech_rev[country][area].columns)
-            for tech in list_of_tech:
-                mkt_val = tech_rev[country][area][tech]/(tech_gen[area][tech])/price_avr[region]
+            list_of_tech = list(tech_rev[country][area].columns)        
+            for tech in list_of_tech:                                                               #loop all technologies
+                mkt_val = tech_rev[country][area][tech]/(tech_gen[area][tech])/price_avr[region]    #calculate dataframe
                 #building dataframe
                 market_val[tech] = None
                 market_val.at[0,tech]= mkt_val.values[0]
                 
-            data_collect_a[area] = market_val
+            data_collect_a[area] = market_val                                       #collect results in dictonary
             del market_val
             market_val = pd.DataFrame()
             
-            data_collect_r[country][area]= data_collect_a[area]
+            data_collect_r[country][area]= data_collect_a[area]                     #collect results in 2-dim dictonary
 
     return data_collect_r
 
 def print_results_df(year,sheetname,data):
+    #function exports dataframe to excel file
+    #input: year of data, excel sheetname, dataframe with data
+    #return: none
     
     print('Writing Results to Excel ',year)
-    csv_file = 'output/Results_'+ year +'_'+ time +'.xlsx'
+    csv_file = 'output/Results_'+ year +'_'+ time +'.xlsx'                  #create filename
     #creating excel file if it not exists
     if not path.exists(csv_file):
         null = pd.DataFrame()
         #create results excel-file           
         with pd.ExcelWriter(csv_file, engine="openpyxl") as writer:
-            null.to_excel(writer, 'temp', encoding='utf8', index=False)
+            null.to_excel(writer, 'temp', encoding='utf8', index=False)     #writing placeholder dataframe to excel file
     
-    #df2 = pd.DataFrame({'Data': [13, 24, 35, 46]})
     
-    writer = pd.ExcelWriter(csv_file, engine='openpyxl',mode="a")
+    writer = pd.ExcelWriter(csv_file, engine='openpyxl',mode="a")           #change mode of excel writer to append
 
-    data.to_excel(writer, sheetname, startcol=1,startrow=1)
-    writer.save()
+    data.to_excel(writer, sheetname, startcol=1,startrow=1)                 #write data to excel, starting at column B, line 2
+    writer.save()                                                           #save excel file
     # wb = load_workbook(csv_file)
     # if 'temp' in wb.sheetnames:
     #     del wb['temp']
@@ -383,24 +392,23 @@ def print_results_df(year,sheetname,data):
 def print_results_dict(year,sheetname,data):
     
     print('Writing Results to Excel ',year)
-    csv_file = 'output/Results_'+ year +'_'+ time +'.xlsx'
+    csv_file = 'output/Results_'+ year +'_'+ time +'.xlsx'                  #create filename
     #creating excel file if it not exists
     if not path.exists(csv_file):
         null = pd.DataFrame()
         #create results excel-file           
         with pd.ExcelWriter(csv_file, engine="openpyxl") as writer:
-            null.to_excel(writer, 'temp', encoding='utf8', index=False)
-    
-    #df2 = pd.DataFrame({'Data': [13, 24, 35, 46]})
-    
-    writer = pd.ExcelWriter(csv_file, engine='openpyxl',mode="a")
-    
-    list_of_keys = data.keys()
-    for key in list_of_keys:
-        data[key].to_excel(writer, sheetname + key, startcol=1,startrow=1)
+            null.to_excel(writer, 'temp', encoding='utf8', index=False)     #writing placeholder dataframe to excel file
     
     
-    writer.save()
+    writer = pd.ExcelWriter(csv_file, engine='openpyxl',mode="a")           #change mode of excel writer to append
+    
+    list_of_keys = data.keys()                                              #get indices of dictonary
+    for key in list_of_keys:                                                #loop over all indices of dictonary
+        data[key].to_excel(writer, sheetname + key, startcol=1,startrow=1)  #export data to excel, create new sheets for each index of dictonary, starting at column B, line 2
+    
+    
+    writer.save()                                                           #save excel file
     # wb = load_workbook(csv_file)
     # if 'temp' in wb.sheetnames:
     #     del wb['temp']
@@ -472,11 +480,11 @@ def Program1(print_all):
     # culculation total generation
     
     for year in allyears_price:
-        data_collect_TotGen[year] = culc_Total_Gen(data_collect_VGE[year])
+        data_collect_TotGen[year] = culc_Total_Gen(data_collect_VGE[year])          #get total generation in region
         print('TotGen: ',data_collect_TotGen[year])
-        data_collect_TotRev[year] = culc_Total_Rev(data_collect_price[year],data_collect_TotGen[year])
+        data_collect_TotRev[year] = culc_Total_Rev(data_collect_price[year],data_collect_TotGen[year])      #get total revenue in region
         print('TotRev: ',data_collect_TotRev[year])
-        data_collect_Price_average[year] = data_collect_TotRev[year]/data_collect_TotGen[year]
+        data_collect_Price_average[year] = data_collect_TotRev[year]/data_collect_TotGen[year]          #culculate average prices
         print('Price_average: ',data_collect_Price_average[year])
         
         
@@ -488,54 +496,46 @@ def Program1(print_all):
 
         data_collect_Rev[year] = culc_Rev_tech(data_collect_price[year],data_collect_VGE[year])     #get tech specific revenue
         print('TotRev_tech: ',data_collect_Rev[year])
-        input('STOP')
         #tech specific market value        
-        data_collect_market_val[year] = culc_market_val(data_collect_Price_average[year],data_collect_Gen[year],data_collect_Rev[year])
+        data_collect_market_val[year] = culc_market_val(data_collect_Price_average[year],data_collect_Gen[year],data_collect_Rev[year]) #get market value
         print('Market values: ',data_collect_market_val[year])
     
-    # for year in allyears_price:
-    #     print_results(year,data_collect_TotGen[year],data_collect_TotRev[year],data_collect_Price_average[year],data_collect_Gen[year],data_collect_Rev[year],data_collect_market_val[year])
+ 
     
     
-    #merge results
-    for year in allyears_price:
+    #merge results and format the dataframe
+    for year in allyears_price:                     #loop over all years
         data_collect_merge[year] = pd.concat([data_collect_TotGen[year],data_collect_TotRev[year],data_collect_Price_average[year]],ignore_index=True)
         #print(data_collect_merge[year])
-        data_collect_merge[year].insert(0,'Type',['Total Gen','Total Rev','Avarage Price'])
-        data_collect_merge[year].insert(0,'Tech',['All','All','All'])
+        data_collect_merge[year].insert(0,'Type',['Total Gen','Total Rev','Avarage Price'])     #insert a column Type
+        data_collect_merge[year].insert(0,'Tech',['All','All','All'])                           #insert a column Tech
         print('Result merge')
         
         
         #assumption only 1 region and 1 area per country
-        list_of_region = list(data_collect_Price_average[year].columns)
+        list_of_region = list(data_collect_Price_average[year].columns)                         #get all regions
 
         #create dataframe for tech gen
-        df3 = pd.DataFrame(columns=['Tech','Type']+list_of_region)
+        df3 = pd.DataFrame(columns=['Tech','Type']+list_of_region)                              #creating a dataframe witch columns tech,type,+all regions
         
         
-        for region in list_of_region:
-            country = convertCountryRegion(region,1)
+        for region in list_of_region:                                                           #loop over all regions
+            country = convertCountryRegion(region,1)                                            #convert region to country
         
             #get all areas in region
             list_of_areas = list(data_collect_Rev[year][country].keys())
-            #print('AREAS')
-            #print(list_of_areas)
             
-            list_of_tech = list(data_collect_Gen[year][list_of_areas[0]].columns)
-            #print('Tech ',list_of_tech, 'Year ', year)
+            list_of_tech = list(data_collect_Gen[year][list_of_areas[0]].columns)               #get all technologies
             
-            for tech in list_of_tech:
+            for tech in list_of_tech:                                                           #loop all technologies
                 #merge tech specific gen
                 df = pd.DataFrame(columns=['Tech','Type',region])
                 df.at[0, 'Tech']=tech
                 df.at[0,'Type']='Generation'
                 df[region]=data_collect_Gen[year][list_of_areas[0]][tech]
                 if tech == list_of_tech[0]:
-                    #print('FIRST')
                     data_collect_area_merge[year] = df
-                    #print(data_collect_area_merge)
                 else:
-                    #print('ELSE')
                     data_collect_area_merge[year] = pd.concat([data_collect_area_merge[year],df],ignore_index=True)
                 
                 
@@ -570,19 +570,22 @@ def Program1(print_all):
     print(data_collect_TotRev)
     print('Price average')
     print(data_collect_Price_average)
-    for year in allyears_price:
+    
+    #export prices to excel
+    for year in allyears_price:     
         print_results_df(year, 'Results', data_collect_merge[year])
     
+    #if option print_all==1, export QEEQ, prices, VGE_T to excel
     if print_all:
         for year in allyears_price:
             print('PRINT QEEQ')
-            print_results_df(year, 'QEEQ', data_collect_QEEQ[year])
+            print_results_df(year, 'QEEQ', data_collect_QEEQ[year])         #export of dataframe to excel
             
             print('PRINT PRICE ',year)            
-            print_results_dict(year, 'PRICE ',data_collect_price[year])
+            print_results_dict(year, 'PRICE ',data_collect_price[year])     #export of dictonary to excel
             
             print('PRINT VGE_T ',year)
-            print_results_dict(year, 'EL_GEN ', data_collect_VGE[year])
+            print_results_dict(year, 'EL_GEN ', data_collect_VGE[year])     #export of dictonary to excel
     
 
 def proceedMainResults(opt_main):
@@ -685,7 +688,10 @@ def VGE(data_raw):
 
 
 def QEEQ(df_QE_raw):
-    #rename unnamed columns
+    #formating QEEQ; renaming and reordering of columns
+    #input: raw QEEQ dataframe
+    #return value: formated dataframe; columns Year,Region,S,T,Level
+    
     col_rename_list = ['Sce','Y1','Year','Region','S','T']
     for m in range(0,len(df_QE_raw['*'].columns)):
         df_QE_raw.columns.values[m] = col_rename_list[m]
@@ -695,6 +701,7 @@ def QEEQ(df_QE_raw):
     
     #replace EPS (=5e+300) with 0
     df_QE_raw['Level'].values[df_QE_raw['Level'].values > 4e300] = 0
+    
     
     return df_QE_raw
     
@@ -734,41 +741,36 @@ def proceedBaseResults(opt_res):
     elif opt_res == '4':
         print('Loading BaseResults.gdx')
         gdx_file = path_Base
-        dataframes ={}
+        dataframes ={}                                  #declaring dictonary
         #input wanted variables
         variable_input = input('Variable?\n')
-        variable_input_list = variable_input.split()
-        #get variables from *gdx
-                   
-        df_BR_raw_collect = {}
+        variable_input_list = variable_input.split()    #input split by space
 
-        
+        df_BR_raw_collect = {}                          #declaring dictonary        
+     
         #check for wrong input
-        for l in range(0,len(variable_input_list)):
-            dataframes[variable_input_list[l]] = gp.to_dataframe(gdx_file,variable_input_list[l], gams_dir = gams_dir_cache,old_interface=False)
+        for l in range(0,len(variable_input_list)):     #loop all wanted variables
+            dataframes[variable_input_list[l]] = gp.to_dataframe(gdx_file,variable_input_list[l], gams_dir = gams_dir_cache,old_interface=False)   #get wanted variables from .gdx            
+            
+            df_BR_raw_collect[l] = dataframes[variable_input_list[l]]           #changing dictonary index is now number; before it was variable name
                 
-                
-            df_BR_raw_collect[l] = dataframes[variable_input_list[l]]
-                
-            #rename unnamed rows
-            if len(df_BR_raw_collect[l] ['*']) > 0:
+            #rename unnamed columns
+            if len(df_BR_raw_collect[l] ['*'].columns) > 0:             #if there are unnamed columns
 
-                #print(len(df_BR_raw_collect[l] ['*'].columns))
-                print(len(df_BR_raw_collect[l] ['*'].columns),' columns of variable ' + variable_input_list[l] + ' are unnamned\n')
+                print(len(df_BR_raw_collect[l] ['*'].columns),' columns of variable ' + variable_input_list[l] + ' are unnamned\n')   #entering names of unnamed columns
                 col_rename = input('Please enter the names of the columns to rename them\n')
-                col_rename_list = col_rename.split()
+                col_rename_list = col_rename.split()                                        #splitting input by space
                 
-                print(col_rename_list)
                 
-                star_len = len(df_BR_raw_collect[l]['*'].columns)
+                star_len = len(df_BR_raw_collect[l]['*'].columns)                           #number of unnamed columns
 
-                df_BR_raw_collect[l].columns=col_rename_list + list(df_BR_raw_collect[l].columns[star_len:])
+                df_BR_raw_collect[l].columns=col_rename_list + list(df_BR_raw_collect[l].columns[star_len:])    #rename columns
                 print(df_BR_raw_collect[l])
-                
-                list_df_header = list(df_BR_raw_collect[l].columns)
+
+                list_df_header = list(df_BR_raw_collect[l].columns)                                             #get list of all column names
                 print(list_df_header)
                 var_drop = input('Select from the above list which parameter you want to drop from variable ' + variable_input_list[l] +'\n')
-                var_drop_list = var_drop.split()
+                var_drop_list = var_drop.split()                                        #get drop list input and split by space
             
                 #checking wrong input
                 for var in var_drop_list:
@@ -777,13 +779,12 @@ def proceedBaseResults(opt_res):
                         input('Press Enter to exit')
                         sys.exit("Error message")
                         
-                    #df_BR_raw_collect[l].drop(df_BR_raw_collect[l].columns[3],axis=1,inplace=True)
-                    df_BR_raw_collect[l].drop(var,axis=1,inplace=True)
+                    df_BR_raw_collect[l].drop(var,axis=1,inplace=True)              #drop column
                     print(df_BR_raw_collect[l])
                 
             
             
-            df_return[l] = df_BR_raw_collect[l]
+            df_return[l] = df_BR_raw_collect[l]                 #rename dictonary after 'if' sequence
         
         del dataframes
         return df_return
@@ -797,12 +798,13 @@ def proceedBaseResults(opt_res):
 def culc_Total_Gen(df_vge):
     # culculats total gen in region, return dataframe over all regions
     #input: dictonary with VGE_T data for one year; area is index of dictonary
-    #return value:
+    #return value: dataframe with regions as columns; one line with value of total generation in region
     
     #declaring dictonaries
     gen_tot = pd.DataFrame()
     gen_temp = pd.DataFrame()
-    gen = pd.DataFrame()
+    
+    gen = pd.DataFrame()                        #create new dataframe
     
     list_of_areas = list(df_vge.keys())         #getting all areas from indices of dictonary
     
@@ -818,48 +820,44 @@ def culc_Total_Gen(df_vge):
     #summerize over all areas of one country
     for areas in all_columns:               #loop over all areas
         
-        if areas[2:] == '_A':
-            print(areas[2:])
-            input('STOP')
+        if areas[2:] == '_A':               #combine all areas to one region; add all other areas to AAA_A
             #get all areas in the region
-            df2 = gen_temp.filter(regex=areas[:2])
+            df2 = gen_temp.filter(regex=areas[:2])              #filter for the first 2 characters, which is the region
             #sum over all areas und name the columns as regions
-            gen[areas[:2]] = df2.sum(axis=1)
-            gen_temp2 = gen.sum(axis=0)
-            new_region = areas[:2]
-            gen_tot[new_region] = None
-            gen_tot.at[0,new_region] = gen_temp2[new_region]
+            gen[areas[:2]] = df2.sum(axis=1)                    #sum over the line
+            gen_temp2 = gen.sum(axis=0)                         #sum over column                         
+            new_region = areas[:2]                              #name of region = first 2 characters of area
+            gen_tot[new_region] = None                          #region name is column name
+            gen_tot.at[0,new_region] = gen_temp2[new_region]    #add value to first line 
 
     return gen_tot
 
 
 def culc_Total_Rev(df_price,df_tot_gen):
-    # culcats total revenue, return dataframe
+    # calculates total revenue of country; assumption only one region per country
+    #input: dictonary with prices, index of dict is C; dataframe with total generation per region
+    #return value: dataframe with regions as column name and value of total generation in first line
     
-    print('Start culc_Total_Rev')
-    print(df_price)
-    list_of_countries = list(df_price.keys())
-
-    tot_rev = pd.DataFrame()
+    list_of_countries = list(df_price.keys())           #get all countries in price dictonary
+    
+    tot_rev = pd.DataFrame()                            #create new dataframe
 
     #culculate total revenue
-    for country in list_of_countries:
+    for country in list_of_countries:                   #loop through all countries
         
         #convert country to region, mode 0
-        region = convertCountryRegion(country,0)
+        region = convertCountryRegion(country,0)        #converting country into region; assumption only one region per country
         
-        temp_price = df_price[country]
+        temp_price = df_price[country]                  
 
-        temp_rev = temp_price[region]*df_tot_gen[region]  
+        temp_rev = temp_price[region]*df_tot_gen[region]        #calculate revenue for each time step  
         temp_rev_sum = temp_rev.sum(axis=0)
         new_country = region
 
-        tot_rev[new_country] = None
-        tot_rev.at[0,new_country] = temp_rev_sum
+        tot_rev[new_country] = None                             #adding new column with region as name
+        tot_rev.at[0,new_country] = temp_rev_sum                #adding value to first line
         
     
-    print(tot_rev)
-    #input('END')
     return tot_rev
 
 
@@ -924,59 +922,61 @@ def culculation(dict_main,dict_qeeq):
 
 def plot_VGE(aggregate):
     # plots VGE_T in a stacked area chart
+    # if aggregate == True, generation with fuels in list_fo_fuels_aggr is aggregated
+    # if aggregate == False, generation of all technologies is in shown in chart
+    # input: boolean
     
-    list_of_fuels = ['NGAS','COAL','LIGN','NUCL','WIND','SUN','WTR','BIOGAS','MSW','GEOTHERMAL','WOODCHIPS']
-    df_return = proceedBaseResults('2')
-    allyears = df_return['Year'].unique() 
-    print(allyears)
+    list_of_fuels_aggr = ['NGAS','COAL','LIGN','NUCL','WIND','SUN','WTR','BIOGAS','MSW','GEOTHERMAL','WOODCHIPS']       #determine aggregation of fuels
+    df_return = proceedBaseResults('2')                                                                                 #get data
+    allyears = df_return['Year'].unique()                                       #get all years in data
     
-    data_collect_VGE = {}
+    data_collect_VGE = {}                                                       #declaring dictonary
     
-    for year in allyears:    
-        data_collect_VGE[year] = get_data_VGE(df_return.loc[df_return['Year'].isin([year])])
+    for year in allyears:                                                                               #loop all years       
+        data_collect_VGE[year] = get_data_VGE(df_return.loc[df_return['Year'].isin([year])])            #seperate date by years; building a dictonary
         
-        allareas = data_collect_VGE[year].keys()
+        allareas = data_collect_VGE[year].keys()                                                        #get all areas in VGE
         
-        for area in allareas:
-            if aggregate:
-                df_temp = pd.DataFrame()
-                for fuel in list_of_fuels:
+        for area in allareas:                                                                           #loop all areas
+            if aggregate:                                                                               #check for aggregation
+                df_temp = pd.DataFrame()                                                                #create new dataframe
+                for fuel in list_of_fuels_aggr:                                                         #loop over fuels
                     
-                    df = data_collect_VGE[year][area].filter(regex=fuel)   #filter columns for all tech with NGAS
-                    sum_fuel = df.sum(axis=1)
-                    df_fuel = sum_fuel.to_frame(name=fuel)
+                    df = data_collect_VGE[year][area].filter(regex=fuel)                                #filter columns for all tech with current fuel
+                    sum_fuel = df.sum(axis=1)                                                   
+                    df_fuel = sum_fuel.to_frame(name=fuel)                                              #converts series to dataframe                                                  
                     
 
                     
-                    df_merge=df_temp.merge(df_fuel, how='outer', left_index=True, right_index=True)
+                    df_merge=df_temp.merge(df_fuel, how='outer', left_index=True, right_index=True)     #merge df_fuel and df_temp
                     df_temp = df_merge
                     
-                    
-                
-                #df_merge.drop(columns=['COAL','LIGN','NUCL','MSW','GEOTHERMAL','WOODCHIPS','BIOGAS'],inplace=True)        
                 print(df_merge)
-               
-                fig, ax = plt.subplots()
-                ax = plt.stackplot(df_merge.index,df_merge.values.T)
-                plt.xlim(4368,4536)
-                plt.legend(df_merge.columns,loc='upper left')
-                #plt.show()
                 
-                print('saving plot as pdf')
-                fig.savefig('plots/'+year +'_'+ area +'_'+ 'VGE_T'+'_'+time+'.pdf')
+                #creating plot
+                fig, ax = plt.subplots()
+                ax = plt.stackplot(df_merge.index,df_merge.values.T)                #stacked area chart
+                plt.xlim(4368,4536)                                                 #limits x-axis
+                plt.legend(df_merge.columns,loc='upper left')                       #position of legend
+                #plt.show()                                                         #show chart in console
+                
+                #saving the plot
+                print('saving plot as pdf') 
+                fig.savefig('plots/'+year +'_'+ area +'_'+ 'VGE_T'+'_'+time+'.pdf')         #saving the plot as pdf; constructing a file name
             
             else:
-                print('Start else \n')
-                data_collect_VGE[year][area].drop(columns=['Year','Area','S','T'],inplace=True)
-                print(data_collect_VGE[year][area])
+                data_collect_VGE[year][area].drop(columns=['Year','Area','S','T'],inplace=True)                 #dropping columns
+
+                #creating plot
                 fig, ax = plt.subplots()
-                ax = plt.stackplot(data_collect_VGE[year][area].index,data_collect_VGE[year][area].values.T)
-                plt.xlim(4368,4536)
-                plt.legend(data_collect_VGE[year][area].columns,loc='upper left')
-                #plt.show()
+                ax = plt.stackplot(data_collect_VGE[year][area].index,data_collect_VGE[year][area].values.T)        #stacked area chart, all technolgies
+                plt.xlim(4368,4536)                                                                                 #limits x-axis
+                plt.legend(data_collect_VGE[year][area].columns,loc='upper left')                                   #position of legend
+                #plt.show()                                                                                         #show chart in console
                 
+                #saving the plot
                 print('saving plot as pdf')
-                fig.savefig('plots/'+year +'_'+ area +'_'+ 'VGE_T'+'_'+time+'.pdf')
+                fig.savefig('plots/'+year +'_'+ area +'_'+ 'VGE_T'+'_'+time+'.pdf')                                 #saving the plot as pdf; constructing a file name
         
 
     
@@ -1016,46 +1016,44 @@ while option != 0:          #end loop if option 0 is chosen
     if option == '1':       #start program 1 with option FALSE
         Program1(False)         
         
-    elif option == '2':
-        Program1(True)
-    elif option == '3':
-        df_return = proceedMainResults(option)
-        for i in df_return.keys():
+    elif option == '2':     #start program 1 with option TRUE, print all data
+        Program1(True)      
+    elif option == '3':     #manually choose a variable from MainResults
+        df_return = proceedMainResults(option)              #getting chosen data in dictonary
+        for i in df_return.keys():                          #export to excel; each chosen variable in separate sheet
             print_results_df('0', str(i+1), df_return[i])
     elif option == '4':
-        df_return = proceedBaseResults(option)
-        print('DF RETURN')
-        print(df_return)
-        for i in df_return.keys():
+        df_return = proceedBaseResults(option)              #getting chosen data in dictonary
+        for i in df_return.keys():                          #export to excel; each chosen variable in separate sheet
             print_results_df('0', str(i+1), df_return[i])
     elif option == '5':       
-        data_collect_price ={}
-        df_price_raw = proceedMainResults('1')
+        data_collect_price ={}                              #declaring dictonary
+        df_price_raw = proceedMainResults('1')              #get prices as dictonary; only one index as number (0)   
         
-        allyears_price = df_price_raw[0]['Y'].unique()
-        for year in allyears_price:        
+        allyears_price = df_price_raw[0]['Y'].unique()      #get all years in price data
+        for year in allyears_price:                         #loop over all years
             #getting price data
             df=df_price_raw[0].loc[df_price_raw[0]['Y'].isin([year])]
-            data_collect_price[year]=get_data_price(df)
+            data_collect_price[year]=get_data_price(df)                 #reformationg price data
             
-        for year in allyears_price:
-            print_results_dict(year, '', data_collect_price[year])
+        for year in allyears_price:                         #export to excel
+            print_results_dict(year, '', data_collect_price[year])              #exporting dictonary to excel
     
     elif option == '6':
-        plot_VGE(False)
+        plot_VGE(False)                 #plot VGE_T
              
-    elif option == 'c':
+    elif option == 'c':                             #selection of file paths
         print('Select MainResults-File')
-        path_Main = filedialog.askopenfilename(title='Selcect MainResults.gdx',filetypes=[('gdx files','*.gdx'),('All files','*.*')])
+        path_Main = filedialog.askopenfilename(title='Selcect MainResults.gdx',filetypes=[('gdx files','*.gdx'),('All files','*.*')]) #starting dialog to get path of MainResults
         print(path_Main)
         
         print('Select BaseResults-File')
-        path_Base = filedialog.askopenfilename(title='Selcect BASEResults.gdx',filetypes=[('gdx files','*.gdx'),('All files','*.*')])
+        path_Base = filedialog.askopenfilename(title='Selcect BASEResults.gdx',filetypes=[('gdx files','*.gdx'),('All files','*.*')]) #starting dialog to get path of BaseResults
         print(path_Base)
         print('----------------------------------------------------------------------------------------------------\n')
             
-    else:
-        sys.exit("End of execution.")
+    else:                                       #all other inputs lead to end of execution
+        sys.exit("End of execution.")           #forcing script exit
     
 #proceedMainResults()
 #
