@@ -729,16 +729,16 @@ def proceedBaseResults(opt_res):
         del dataframes           #deleting dataframe to free memory space
         return df_return
     
-    elif opt_res == '2':       #option1: getting VGE_T
+    elif opt_res == '2':       #option2: getting VGE_T
         print('Loading BaseResults.gdx')
         gdx_file = path_Base
         dataframes = gp.to_dataframe(gdx_file,'VGE_T', gams_dir = gams_dir_cache,old_interface=False)
-        df_return=VGE(dataframes)
+        df_return[0]=VGE(dataframes)
         
         del dataframes
         return df_return
         
-    elif opt_res == '4':
+    elif opt_res == '4':        #choose variables manually 
         print('Loading BaseResults.gdx')
         gdx_file = path_Base
         dataframes ={}                                  #declaring dictonary
@@ -927,7 +927,8 @@ def plot_VGE(aggregate):
     # input: boolean
     
     list_of_fuels_aggr = ['NGAS','COAL','LIGN','NUCL','WIND','SUN','WTR','BIOGAS','MSW','GEOTHERMAL','WOODCHIPS']       #determine aggregation of fuels
-    df_return = proceedBaseResults('2')                                                                                 #get data
+    df_return_dict = proceedBaseResults('2')                                    #get data
+    df_return = df_return_dict[0]                                               #get rid of dictonary                                   
     allyears = df_return['Year'].unique()                                       #get all years in data
     
     data_collect_VGE = {}                                                       #declaring dictonary
@@ -1040,7 +1041,7 @@ while option != 0:          #end loop if option 0 is chosen
             print_results_dict(year, '', data_collect_price[year])              #exporting dictonary to excel
     
     elif option == '6':
-        plot_VGE(False)                 #plot VGE_T
+        plot_VGE(True)                 #plot VGE_T
              
     elif option == 'c':                             #selection of file paths
         print('Select MainResults-File')
