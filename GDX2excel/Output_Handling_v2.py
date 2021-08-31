@@ -704,6 +704,37 @@ def QEEQ(df_QE_raw):
     
     
     return df_QE_raw
+
+def demand(df_raw):
+    #formating DE_VAR_T and DE; renaming and reordering of columns
+    #input: dictonary with data of DE_VAR_T and DE; index 0: DE_VAR_T, index 1: DE
+    
+    #renaming DE_VAR_T
+    
+    col_rename_list = ['Sce','Category','Region','DE_USER','S','T']
+    for m in range(0,len(df_raw[0]['*'].columns)):
+        df_raw[0].columns.values[m] = col_rename_list[m]
+
+    # drop unnecessary columns
+    df_raw[0].drop(columns='Category',inplace=True)                #syntax is different to function VGE,QEEQ due to an unknown error message
+    df_raw[0].drop(columns='Sce',inplace=True)
+
+    #replace EPS (=5e+300) with 0
+    df_raw[0]['Value'].values[df_raw[0]['Value'].values > 4e300] = 0
+   
+    #renaming DE
+    col_rename_list = ['Sce','Category','Year','Region','DE_USER']
+    for m in range(0,len(df_raw[1]['*'].columns)):
+        df_raw[1].columns.values[m] = col_rename_list[m]
+
+    # drop unnecessary columns
+    df_raw[1].drop(columns='Category',inplace=True)                #syntax is different to function VGE,QEEQ due to an unknown error message
+    df_raw[1].drop(columns='Sce',inplace=True)
+
+    #replace EPS (=5e+300) with 0
+    df_raw[1]['Value'].values[df_raw[1]['Value'].values > 4e300] = 0
+
+    return df_raw
     
         
     
@@ -711,6 +742,7 @@ def proceedBaseResults(opt_res):
     #opening BaseResults, choosing variable, return dataframe
     #option '1': get VGE_T and QEEQ
     #option '2': get VGE_T
+    #option '3': get DE_VAR_T
     #option '4': Manually choose variable
     #return value: dictonary of dataframes; dictonary with number corresponding to variable as index; dataframe columns
     #              from option or manually chosen
@@ -733,9 +765,19 @@ def proceedBaseResults(opt_res):
         print('Loading BaseResults.gdx')
         gdx_file = path_Base
         dataframes = gp.to_dataframe(gdx_file,'VGE_T', gams_dir = gams_dir_cache,old_interface=False)
-        df_return[0]=VGE(dataframes)
+        df_return[0] = VGE(dataframes)
         
         del dataframes
+        return df_return
+    
+    elif opt_res == '3':        #option3: getting DE_VAR_T
+        print('Loading BaseResults.gdx')
+        gdx_file = path_Base
+        df_return[0] = gp.to_dataframe(gdx_file,'DE_VAR_T', gams_dir = gams_dir_cache,old_interface=False)        
+        df_return[1] =  gp.to_dataframe(gdx_file,'DE', gams_dir = gams_dir_cache,old_interface=False)
+        
+        df_return = demand(df_return)
+        
         return df_return
         
     elif opt_res == '4':        #choose variables manually 
@@ -978,9 +1020,95 @@ def plot_VGE(aggregate):
                 #saving the plot
                 print('saving plot as pdf')
                 fig.savefig('plots/'+year +'_'+ area +'_'+ 'VGE_T'+'_'+time+'.pdf')                                 #saving the plot as pdf; constructing a file name
+                
+
+def line_demand():
+    #creates line chart of demand
+    #input: none
+    #return value: 3-dim dictonary; indices are [region][DE_user][year]; dataframe only 1 column with hourly demand
         
+    dict_DE_VAR = {}                                                            #declaring dictonary
+    dict_user = {}
+    dict_sum_DE_VAR = {}
+    dict_DE = {}
+    
+    demand_dict = nested_dict(3, float)
+    
+    df_return_dict = proceedBaseResults('3')                                    #get data
+    df_DE_VAR = df_return_dict[0]                                               #get rid of dictonary
+    df_DE = df_return_dict[1]
+    
+    #reordering data    
+    dict_DE_VAR = create_dict_region(df_DE_VAR)                                 #create dictonary out of dataframe
+    
+    allregions = dict_DE_VAR.keys()
+    
+    for region in allregions:
+       
+        allusers = dict_DE_VAR[region]['DE_USER'].unique()                      #get all DE_user groups
+
+        dict_sum_DE_VAR[region] = pd.DataFrame({'DE_USER': allusers}, columns = ['DE_USER','Value'])
+        
+        for user in allusers:                                                   #loop all user groups
+            dict_user[user]=dict_DE_VAR[region].loc[dict_DE_VAR[region]['DE_USER'].isin([user])]      #creates dictonary for all DE_user groups of one region
+            sum_DE_VAR = dict_user[user]['Value'].sum(axis=0)                   #culcalating sum
+
+            dict_sum_DE_VAR[region].at[dict_sum_DE_VAR[region][dict_sum_DE_VAR[region]['DE_USER']==user].index.values,'Value'] = sum_DE_VAR #creates dataframe with sum of DE_VAR from all DE_USER groups per region
+        
+    #culculation of actual demand
+    print(dict_sum_DE_VAR)
+    
+    for region in allregions:                                                       #loop all regions
+        allusers = dict_user.keys()                                                 #get all user groups
+              
+        for user in allusers:                                                       #loop all user groups
+
+            temp=dict_sum_DE_VAR[region].loc[dict_sum_DE_VAR[region]['DE_USER'].isin([user])]           #get sum of demand for specific unser groups
+            allyears = df_DE['Year'].unique()                                                           #get all years in yearly demand DE
+            
+            if not temp.empty: #check for DE-user groups in DE_VAR
+                
+                for year in allyears:                                                                   #loop all years
+                    temp2 = df_DE.loc[df_DE['Year'].isin([year])]                                       #select data by year 
+                    temp3 = temp2.loc[temp2['Region'].isin([region])]                                   #select data by region
+                    temp4 = temp3.loc[temp3['DE_USER'].isin([user])]                                    #select data by user group
+                    temp4.reset_index(inplace=True,drop=True)                                           #reset index
+                    
+                    
+                    if not temp4.empty:                 #check for DE-user groups in DE_VAR
+                    
+                        relation = temp4['Value']/temp['Value']                                         #calculate relation between yearly demand DE and sum of DE_VAR_T
+
+                        result_demand = dict_user[user]['Value'].values*relation.values                 #calculate demand 
+                        df_result = pd.DataFrame(result_demand)                                         #create dataframe with culcalated demand
+                        df_result.reset_index(inplace=True,drop=True)                                   #reset index
+                        
+                        demand_dict[region][user][year] = df_result                                     #create 3-dim dictonary
+    
+    #plot a line chart
+    fig, ax = plt.subplots()
+    
+    ax.plot(demand_dict['AT']['RESE']['2030'].values)                #line plot
+    plt.xlim(4368,4536)                                                 #limits x-axis
+    #plt.legend(df_merge.columns,loc='upper left')                       #position of legend
+    plt.show()                                                         #show chart in console
+    
+    return demand_dict                                                  #return 3-dim dictonary
 
     
+def create_dict_region(df):
+    #creats dictonary out of dataframe; index is region
+    #input: dataframe
+    #return: dictonary,index is region
+    
+    dict_regions = {}                                       #declaring dictonary
+    
+    allregions = df['Region'].unique()                      #get all regions
+    
+    for region in allregions:                                       #loop over regions
+        dict_regions[region]=df.loc[df['Region'].isin([region])]    #get data to dictonary 
+        
+    return dict_regions
     
 #======================MAIN===================================================
 #User interface
@@ -1011,6 +1139,7 @@ while option != 0:          #end loop if option 0 is chosen
     print('4:  Manually choose variable from Base-results and export to .xlsx')
     print('5:  Get electricity price for all countries and export to .xlsx')
     print('6:  Plot VGE_T in stacked area plot')
+    print('7: TEST creating line plot of demand')
     option = input('0: Stop execution \n')
     print('----------------------------------------------------------------------------------------------------\n')
     
@@ -1042,6 +1171,9 @@ while option != 0:          #end loop if option 0 is chosen
     
     elif option == '6':
         plot_VGE(True)                 #plot VGE_T
+        
+    elif option == '7':                 #create demand line plot
+        line_demand()
              
     elif option == 'c':                             #selection of file paths
         print('Select MainResults-File')
